@@ -23,27 +23,55 @@ async function create(params) {
         throw 'Email "' + params.email + '" is already registered';
     }
     
-   
+
     const user = new db.User(params);
     user.passwordHash = await bcrypt.hash(params.password, 10);
     await user.save();
 }
 
 async function update(id, params) {
-    const user = await getUser(id);
+    // Extract password fields from params if they exist
+    const { currentPassword, newPassword, confirmPassword, ...updateFields } = params;
 
-    const usernameChanged = params.username && user.username !== params.username;
-    if (usernameChanged && await db.User.findOne({ where: { username: params.username } })) {
-        throw 'Username "' + params.username + '" is already taken';
+    // Fetch the user with password hash
+    const user = await db.User.scope('withHash').findByPk(id);
+
+    if (!user) {
+        throw 'User not found';
     }
 
-    if (params.password) {
-        params.passwordHash = await bcrypt.hash(params.password, 10);
+    // Check if username has changed and is available
+    const usernameChanged = updateFields.username && user.username !== updateFields.username;
+    if (usernameChanged && await db.User.findOne({ where: { username: updateFields.username } })) {
+        throw `Username "${updateFields.username}" is already taken`;
     }
-    
-    Object.assign(user, params);
+
+    // If a password change is requested, validate current and new passwords
+    if (currentPassword && newPassword) {
+        const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isMatch) {
+            throw 'Current password is incorrect';
+        }
+
+        if (await bcrypt.compare(newPassword, user.passwordHash)) {
+            throw 'New password cannot be the same as the current password';
+        }
+
+        if (newPassword !== confirmPassword) {
+            throw 'New password and confirm password do not match';
+        }
+
+        // Hash the new password and update the user
+        user.passwordHash = await bcrypt.hash(newPassword, 10);
+    }
+
+    // Apply other updates from params
+    Object.assign(user, updateFields);
+
+    // Save the user
     await user.save();
 }
+
 
 async function _delete(id) {
     const user = await getUser(id);

@@ -7,9 +7,10 @@ const userService = require('./user.service');
 
 
 router.get('/', getAll);
-router.get('/:id', getById);
+router.get('/profile/:id', getById);
 router.post('/', createSchema, create);
-router.put('/:id', updateSchema, update);
+router.put('/profile/:id', updateSchema, update);
+router.put('/profile/password/:id', updateSchema, update);
 router.delete('/:id', _delete);
 
 module.exports = router;
@@ -46,7 +47,8 @@ function createSchema(req, res, next) {
         lastName: Joi.string().required(),
         role: Joi.string().valid(Role.Admin, Role.User).required(),
         email: Joi.string().email().required(),
-        password: Joi.string().min(6).required(),
+        profilePic: Joi.string().required(),
+        password: Joi.string().min(6).required(),     
         confirmPassword: Joi.string().valid(Joi.ref('password')).required()
 
     });
@@ -59,9 +61,11 @@ function updateSchema(req, res, next) {
         firstName: Joi.string().empty(''),
         lastName: Joi.string().empty(''),
         role: Joi.string().valid(Role.Admin, Role.User).empty(''),
-        email: Joi.string().email().empty(''),
-        password: Joi.string().min(6).empty(''),
-        confirmPassword: Joi.string().valid(Joi.ref('password')).empty('')
-    }).with('password', 'confirmPassword');
+        email: Joi.string().email().required(),
+        profilePic: Joi.string().empty(''),
+        currentPassword: Joi.string().min(6).optional(),
+        newPassword: Joi.string().min(6).optional(),
+        confirmPassword: Joi.string().valid(Joi.ref('newPassword')).optional()
+    }).with('newPassword', 'confirmPassword');
     validateRequest(req, next, schema);
-}
+}   
